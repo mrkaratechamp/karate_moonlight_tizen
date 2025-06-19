@@ -33,9 +33,11 @@ function attachListeners() {
   $("#remoteAudioEnabledSwitch").on('click', saveRemoteAudio);
   $('#optimizeGamesSwitch').on('click', saveOptimize);
   $('#framePacingSwitch').on('click', saveFramePacing);
+  $('.audioConfigMenu li').on('click', saveAudioConfig);
   $('#audioSyncSwitch').on('click', saveAudioSync);
   $('#hdrSwitch').on('click', saveHdr);
   $('.codecVideoMenu li').on('click', saveCodecVideo);
+  $('#statsSwitch').on('click', saveStats);
   $('#addHostCell').on('click', addHost);
   $('#backIcon').on('click', showHostsAndSettingsMode);
   $('#quitCurrentApp').on('click', stopGameWithConfirmation);
@@ -48,6 +50,8 @@ function attachListeners() {
         Navigation.push(view);
     });
   }
+  registerMenu('selectCodecVideo', Views.SelectCodecVideoMenu);
+  registerMenu('selectAudioConfig', Views.SelectAudioConfigMenu);
   registerMenu('selectCodecVideo', Views.SelectCodecVideoMenu);
   registerMenu('selectResolution', Views.SelectResolutionMenu);
   registerMenu('selectFramerate', Views.SelectFramerateMenu);
@@ -110,6 +114,7 @@ function changeUiModeForNaClLoad() {
   $("#main-content").children().not("#listener, #naclSpinner").hide();
   $('#naclSpinnerMessage').text('Loading Moonlight plugin...');
   $('#naclSpinner').css('display', 'inline-block');
+  $('#stream_stats').css('display', 'inline-block');
 }
 
 function startPollingHosts() {
@@ -635,6 +640,7 @@ function showApps(host) {
   // Show a spinner while the applist loads
   $('#naclSpinnerMessage').text('Loading apps...');
   $('#naclSpinner').css('display', 'inline-block');
+  $('#stream_stats').css('display', 'inline-block');
 
   $("div.game-container").remove();
 
@@ -798,6 +804,8 @@ function startGame(host, appID) {
       const framePacingEnabled = $('#framePacingSwitch').parent().hasClass('is-checked') ? 1 : 0;
       const audioSyncEnabled = $('#audioSyncSwitch').parent().hasClass('is-checked') ? 1 : 0;
       const hdrEnabled = $('#hdrSwitch').parent().hasClass('is-checked') ? 1 : 0;
+      var audioConfig = $('#selectAudioConfig').data('value').toString();
+      const statsEnabled = $('#statsSwitch').parent().hasClass('is-checked') ? 1 : 0;
       console.log('%c[index.js, startGame]', 'color:green;',
                   'startRequest:' + host.address +
                   ":" + streamWidth +
@@ -808,7 +816,10 @@ function startGame(host, appID) {
                   ":" + framePacingEnabled,
                   ":" + audioSyncEnabled,
                   ":" + hdrEnabled,
-                  ":" + codecVideo);
+                  ":" + codecVideo,
+                  ":" + audioConfig,
+                  ":" + statsEnabled
+                  );
 
       var rikey = generateRemoteInputKey();
       var rikeyid = generateRemoteInputKeyId();
@@ -845,7 +856,9 @@ function startGame(host, appID) {
             audioSyncEnabled,
             hdrEnabled,
             codecVideo,
-            host.serverCodecSupportMode		 
+            host.serverCodecSupportMode,
+            audioConfig,
+            statsEnabled
           ]);
         }, function(failedResumeApp) {
           console.error('%c[index.js, startGame]', 'color:green;', 'Failed to resume the app! Returned error was' + failedResumeApp);
@@ -888,7 +901,9 @@ function startGame(host, appID) {
           audioSyncEnabled,
           hdrEnabled,
           codecVideo,
-          host.serverCodecSupportMode			  
+          host.serverCodecSupportMode,
+          audioConfig,
+          statsEnabled
         ]);
       }, function(failedLaunchApp) {
         console.error('%c[index.js, launchApp]', 'color: green;', 'Failed to launch app width id: ' + appID + '\nReturned error was: ' + failedLaunchApp);
@@ -912,6 +927,9 @@ function playGameMode() {
   fullscreenNaclModule();
   $('#loadingSpinner').css('display', 'inline-block');
   Navigation.stop();
+
+  $('#stream_stats').css('display', 'inline-block');
+  $('#stream_stats').show();
 }
 
 // Maximize the size of the nacl module by scaling and resizing appropriately
@@ -1151,6 +1169,15 @@ function saveHdr() {
     const chosenHDR = $("#hdrSwitch").parent().hasClass('is-checked');
     console.log('%c[index.js, saveHDR]', 'color: green;', 'Saving HDR state : ' + chosenHDR);
     storeData('HDR', chosenHDR, null);
+    updateDefaultBitrate();
+  }, 100);
+}
+
+function saveStats() {
+  setTimeout(function() {
+    const chosenStats = $("#statsSwitch").parent().hasClass('is-checked');
+    console.log('%c[index.js, saveStats]', 'color: green;', 'Saving Stats state : ' + chosenStats);
+    storeData('stats', chosenStats, null);
   }, 100);
 }
 
@@ -1158,6 +1185,14 @@ function saveCodecVideo() {
   var chosenCodecVideo = $(this).data('value');
   $('#selectCodecVideo').text($(this).text()).data('value', chosenCodecVideo);
   storeData('codecVideo', chosenCodecVideo, null);
+  updateDefaultBitrate();
+  Navigation.pop();
+}
+
+function saveAudioConfig() {
+  var chosenAudioConfig = $(this).data('value');
+  $('#selectAudioConfig').text($(this).text()).data('value', chosenAudioConfig);
+  storeData('audioConfig', chosenAudioConfig, null);
   Navigation.pop();
 }
 
@@ -1196,44 +1231,39 @@ function saveRemoteAudio() {
 function updateDefaultBitrate() {
   var res = $('#selectResolution').data('value');
   var frameRate = $('#selectFramerate').data('value').toString();
+  var codecVideo = $('#selectCodecVideo').data('value').toString();
+  var hdrEnabled = $('#hdrSwitch').parent().hasClass('is-checked') ? 1 : 0;
+  var resSplit = res.split(":");
+  var width = parseInt(resSplit[0]);
+  var height = parseInt(resSplit[1]);
+  var newBitrate = getDefaultBitrate(width, height, frameRate, codecVideo, hdrEnabled);
 
-  // These quality presets include video resolution like 480p, 720p, 1080p, 1440p, 2160p (4K) and video frame rate like 30 FPS and 60 FPS
-  if (res === "858:480") {
-    if (frameRate === "30") { // 480p, 30 FPS
-      $('#bitrateSlider')[0].MaterialSlider.change('2');
-    } else { // 480p, 60 FPS
-      $('#bitrateSlider')[0].MaterialSlider.change('4');
-    }
-  } else if (res === "1280:720") {
-    if (frameRate === "30") { // 720p, 30 FPS
-      $('#bitrateSlider')[0].MaterialSlider.change('5');
-    } else { // 720p, 60 FPS
-      $('#bitrateSlider')[0].MaterialSlider.change('10');
-    }
-  } else if (res === "1920:1080") {
-    if (frameRate === "30") { // 1080p, 30 FPS
-      $('#bitrateSlider')[0].MaterialSlider.change('10');
-    } else { // 1080p, 60 FPS
-      $('#bitrateSlider')[0].MaterialSlider.change('20');
-    }
-  } else if (res === "2560:1440") {
-    if (frameRate === "30") { // 1440p, 30 FPS
-      $('#bitrateSlider')[0].MaterialSlider.change('20');
-    } else { // 1440p, 60 FPS
-      $('#bitrateSlider')[0].MaterialSlider.change('40');
-    }
-  } else if (res === "3840:2160") {
-    if (frameRate === "30") { // 2160p (4K), 30 FPS
-      $('#bitrateSlider')[0].MaterialSlider.change('40');
-    } else { // 2160p (4K), 60 FPS
-      $('#bitrateSlider')[0].MaterialSlider.change('80');
-    }
-  } else { // unrecognized option. In case someone screws with the JS to add custom resolutions
-    $('#bitrateSlider')[0].MaterialSlider.change('10');
+  if (newBitrate <= 0) {
+    newBitrate = 20;
   }
+
+  $('#bitrateSlider')[0].MaterialSlider.change(newBitrate / 1000);
 
   updateBitrateField();
   saveBitrate();
+}
+
+function getDefaultBitrate(width, height, fps, codecVideo, hdrEnabled) {
+  // Reference for bitrate calculation formula: https://www.reddit.com/r/MoonlightStreaming/comments/1gg2cdy/sweet_spot_bitrate/
+  var codecReductionFactor = {"HEVC" :  0.6, "AV1" : 0.4, "265" : 0.6, "1" : 0.4 }[codecVideo] || 1.0;
+ 
+  var bitrateFactor;
+  if (hdrEnabled) {
+    bitrateFactor = 6630.5;
+  } else {
+    bitrateFactor = 8309;
+  }
+
+  var h264Bitrate = width * height * fps / bitrateFactor;
+
+  var finalBitrate = h264Bitrate * codecReductionFactor;
+
+  return Math.round(finalBitrate);
 }
 
 function initSamsungKeys() {
@@ -1253,6 +1283,9 @@ function initSamsungKeys() {
       'ChannelList',   // F7
       'ChannelDown',   // F11
       'ChannelUp',     // F12
+      'MediaPlayPause',
+      'MediaPlay',
+      'Info'
     ],
     onKeydownListener: remoteControllerHandler
   };
@@ -1341,6 +1374,26 @@ function loadUserDataCb() {
       document.querySelector('#hdrBtn').MaterialIconToggle.uncheck();
     } else {
       document.querySelector('#hdrBtn').MaterialIconToggle.check();
+    }
+  });
+
+  console.log('load stored audioConfig prefs');
+  getData('audioConfig', function(previousValue) {
+    if (previousValue.audioConfig != null) {
+      $('.audioConfigMenu li').each(function() {
+        if ($(this).data('value') === previousValue.audioConfig) {
+          $('#selectAudioConfig').text($(this).text()).data('value', previousValue.audioConfig);
+        }
+      });
+    }
+  });
+
+  console.log('load stats prefs');
+  getData('stats', function(previousValue) {
+    if (previousValue.stats == true) {
+      document.querySelector('#statsBtn').MaterialIconToggle.check();
+    } else {
+      document.querySelector('#statsBtn').MaterialIconToggle.uncheck();
     }
   });
 

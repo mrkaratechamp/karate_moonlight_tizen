@@ -116,7 +116,9 @@ const Views = {
         'optimizeGamesBtn',
         'framePacingBtn',
         'audioSyncBtn',
-        'hdrBtn'
+        'hdrBtn',
+        'selectAudioConfig',
+        'statsBtn'
       ];
     }),
     left: function () { this.view.prev() },
