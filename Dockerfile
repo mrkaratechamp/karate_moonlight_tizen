@@ -67,10 +67,17 @@ RUN cmake \
 	-B build
 RUN cmake --build build
 RUN cmake --install build --prefix build
-RUN sed -i 's/\[30,60\]/[30,60,90,120,144]/' \
+# ─── Añadimos 90 / 100 / 120 / 144 FPS al menú ──────────────
+# Buscamos la línea que ya existe para 60 FPS y, justo debajo,
+# insertamos los 4 <li> nuevos.  (El «\» al final de cada línea
+# mantiene el salto dentro del sed.)
+RUN sed -i '/data-value="60">60 FPS<\/li>/a\
+\              <li class="mdl-menu__item" data-value="90">90 FPS<\/li>\
+\              <li class="mdl-menu__item" data-value="100">100 FPS<\/li>\
+\              <li class="mdl-menu__item" data-value="120">120 FPS<\/li>\
+\              <li class="mdl-menu__item" data-value="144">144 FPS<\/li>' \
     build/widget/index.html
-
-
+# ────────────────────────────────────────────────────────────
 RUN cp moonlight-chrome-tizen/icons/icon.png build/widget/
 
 # Package and sign application
