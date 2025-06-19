@@ -62,7 +62,7 @@ COPY --chown=moonlight . ./moonlight-chrome-tizen
 RUN cmake \
 	-DCMAKE_TOOLCHAIN_FILE=/home/moonlight/emscripten-release-bundle/emsdk/fastcomp/emscripten/cmake/Modules/Platform/Emscripten.cmake \
 	-G Ninja \
- +	-DENABLE_120FPS=ON \
+ 	-DENABLE_120FPS=ON \
 	-S moonlight-chrome-tizen \
 	-B build
 RUN cmake --build build
