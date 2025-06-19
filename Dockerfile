@@ -67,6 +67,9 @@ RUN cmake \
 	-B build
 RUN cmake --build build
 RUN cmake --install build --prefix build
+RUN sed -i 's/\[30,60\]/[30,60,90,120,144]/' \
+    build/widget/index.html
+
 
 RUN cp moonlight-chrome-tizen/icons/icon.png build/widget/
 
