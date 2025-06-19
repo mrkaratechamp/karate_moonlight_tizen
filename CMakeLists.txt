@@ -2,6 +2,16 @@ cmake_minimum_required(VERSION 3.10)
 
 project(MoonlightWasm VERSION 1.0)
 
+# ────── 120 FPS toggle ──────────────────────────────────────────
+option(ENABLE_120FPS "Enable 120 FPS / 144 FPS streaming" OFF)
+
+if (ENABLE_120FPS)
+    # Sobrescribe el tope de la librería común (por defecto 60)
+    add_compile_definitions(VIDEO_MAX_FPS=120)
+endif()
+# ────────────────────────────────────────────────────────────────
+
+
 add_compile_options(-w -s WASM=1 -fno-ident -Os -flto -DSAMSUNG_WRT -DOS_WASM -DNDEBUG)
 
 add_library(moonlight-rs STATIC
